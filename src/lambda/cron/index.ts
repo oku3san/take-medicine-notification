@@ -6,7 +6,7 @@ import * as AWS from "aws-sdk";
 console.log('Loading function');
 
 export const handler: Lambda.Handler = async (event, context: Lambda.Context) => {
-  console.log('Received event:', JSON.stringify(event, null, 2));
+  console.log('Received event:', JSON.stringify(event));
   console.log('value1 =', event.key1);
   console.log('value2 =', event.key2);
   console.log('value3 =', event.key3);
