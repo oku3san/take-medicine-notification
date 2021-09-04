@@ -18,9 +18,9 @@ services:
     depends_on:
       - dynamodb
   lambda-cron:
-    build: ./lambda/cron
+    build:
+      context: ./lambda/cron
+      target: production
     container_name: lambda-cron
     ports:
       - 8080:8080
-    volumes:
-      - $HOME/.aws/:/root/.aws/
