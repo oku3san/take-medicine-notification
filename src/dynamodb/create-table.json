@@ -1,14 +1,14 @@
 {
     "AttributeDefinitions": [
         {
-            "AttributeName": "Id",
-            "AttributeType": "N"
+            "AttributeName": "UserId",
+            "AttributeType": "S"
         }
     ],
     "TableName": "medicineNotification",
     "KeySchema": [
         {
-            "AttributeName": "Id",
+            "AttributeName": "UserId",
             "KeyType": "HASH"
         }
     ],

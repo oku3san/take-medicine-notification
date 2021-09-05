@@ -1,0 +1,16 @@
+{
+  "medicineNotification": [
+    {
+      "PutRequest": {
+        "Item": {
+          "UserId": {
+            "S": "test-id"
+          },
+          "Timetable": {
+            "S": "朝"
+          }
+        }
+      }
+    }
+  ]
+}
