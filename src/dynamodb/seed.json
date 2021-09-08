@@ -8,6 +8,24 @@
           },
           "Timetable": {
             "S": "朝"
+          },
+          "Hour": {
+            "N": "11"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "UserId": {
+            "S": "test-id"
+          },
+          "Timetable": {
+            "S": "昼"
+          },
+          "Hour": {
+            "N": "14"
           }
         }
       }
