@@ -18,7 +18,8 @@ export const handler: Lambda.Handler = async (event: any) => {
   console.log('処理開始')
   // EventBridge の発火時間を取得
   const date: Date = new Date(event.time)
-  const hour: number = Number(date.getHours().toString().padStart(2, '0'))
+  const jstDate: Date = convertUtcToJst(date.getTime())
+  const hour: number = Number(jstDate.getHours().toString().padStart(2, '0'))
 
   // 特定の時間に status を 0 に変更する
   if (hour === 0) {
@@ -231,4 +232,9 @@ const sendMessage: any = async (lineMessage: Types.Message) => {
         console.error('メッセージ送信失敗', JSON.stringify(e))
       }
   }
+}
+
+const convertUtcToJst = (utcDate: number) => {
+  const jstDate: Date = new Date(utcDate + ((new Date().getTimezoneOffset() + (9 * 60)) * 60 * 1000))
+  return jstDate
 }
