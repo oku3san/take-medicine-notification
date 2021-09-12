@@ -26,8 +26,10 @@ export const handler: Lambda.Handler = async (event: any) => {
       await changeAllStatus()
     ]).then(() => {
       console.log("ステータス初期化実施")
+      console.log("処理成功")
     }).catch(() => {
       console.error("ステータス初期化失敗")
+      console.log("処理失敗")
     })
   } else {
     // 発火時間をもとに DynamoDB より値取得
@@ -40,6 +42,7 @@ export const handler: Lambda.Handler = async (event: any) => {
     } else { // 検索結果が0件ではなかったら
        if (data.Items[0].Status === 1) {  // ステータスが1なら終了
          console.log('実施済みのため処理終了')
+         console.log("処理成功")
          return
        } else {  // ステータスが0なら処理継続
          const timetable: string = data.Items[0].Timetable
