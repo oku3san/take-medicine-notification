@@ -15,58 +15,64 @@ const userId: any = process.env.userId
 
 // Lambda の実行 handler
 export const handler: Lambda.Handler = async (event: any) => {
+  console.log('処理開始')
   // EventBridge の発火時間を取得
   const date: Date = new Date(event.time)
   const hour: number = Number(date.getHours().toString().padStart(2, '0'))
 
   // 特定の時間に status を 0 に変更する
   if (hour === 0) {
-      Promise.all([
-        await changeAllStatus()
-      ]).then(() => {
-        console.log("ステータス初期化実施")
-      }).catch(() => {
-        console.error("ステータス初期化失敗")
-      })
+    Promise.all([
+      await changeAllStatus()
+    ]).then(() => {
+      console.log("ステータス初期化実施")
+    }).catch(() => {
+      console.error("ステータス初期化失敗")
+    })
   } else {
     // 発火時間をもとに DynamoDB より値取得
     const data: any = await fetchData(hour)
 
-    if (data.Count === 0) { // 検索結果が0件なら
+    if (data.Count === 0) {  // 検索結果が0件なら
       const lineMessage: Types.Message = {type: "text", text: '0件'}
       console.log(lineMessage)
       console.log('処理成功')
     } else { // 検索結果が0件ではなかったら
-      const timetable: string = data.Items[0].Timetable
-      const lineMessage: Types.Message = {
-        "type": "template",
-        "altText": "確認",
-        "template": {
-          "type": "confirm",
-          "text": `${timetable}の薬は飲みましたか`,
-          "actions": [
-            {
-              "type": "message",
-              "label": "はい",
-              "text": "はい"
-            },
-            {
-              "type": "message",
-              "label": "いいえ",
-              "text": "いいえ"
-            }
-          ]
-        }
-      }
-      Promise.all([
-        await sendMessage(lineMessage)
-      ]).then(() => {
-        console.log('処理成功')
-        return
-      }).catch(() => {
-        console.log('処理失敗')
-        return
-      })
+       if (data.Items[0].Status === 1) {  // ステータスが1なら終了
+         console.log('実施済みのため処理終了')
+         return
+       } else {  // ステータスが0なら処理継続
+         const timetable: string = data.Items[0].Timetable
+         const lineMessage: Types.Message = {
+           "type": "template",
+           "altText": "確認",
+           "template": {
+             "type": "confirm",
+             "text": `${timetable}の薬は飲みましたか`,
+             "actions": [
+               {
+                 "type": "message",
+                 "label": "はい",
+                 "text": "はい"
+               },
+               {
+                 "type": "message",
+                 "label": "いいえ",
+                 "text": "いいえ"
+               }
+             ]
+           }
+         }
+         Promise.all([
+           await sendMessage(lineMessage)
+         ]).then(() => {
+           console.log('処理成功')
+           return
+         }).catch(() => {
+           console.log('処理失敗')
+           return
+         })
+       }
     }
   }
 }
@@ -92,6 +98,7 @@ const setDynamodbOptions = (): void => {
 
 // DynamoDB からデータ取得
 const fetchData: any = async (hour: number) => {
+  console.log('データ取得開始')
   setDynamodbOptions()
   const params = {
     TableName: tableName,
@@ -107,20 +114,21 @@ const fetchData: any = async (hour: number) => {
   }
 
   try {
-    const result  = await documentClient.query(params).promise()
+    const result = await documentClient.query(params).promise()
     console.log('データ取得成功')
     return result
   } catch (e) {
     console.error('データ取得失敗', JSON.stringify(e))
-    return
   }
 }
 
 // Status を変更する
 const changeStatus = async (status: number, timetable:string, hour?: number) => {
+  console.log('changeStatus データ更新開始')
   setDynamodbOptions()
   let params: any
   if (hour) {
+    // 特定時間のステータスを更新する
     params = {
       TableName: tableName,
       Key: {
@@ -139,6 +147,7 @@ const changeStatus = async (status: number, timetable:string, hour?: number) => 
       }
     }
   } else {
+    // 特定タイムテーブルのステータスを更新する
     params = {
       TableName: tableName,
       Key: {
@@ -156,19 +165,20 @@ const changeStatus = async (status: number, timetable:string, hour?: number) => 
   }
 
   try {
-    await documentClient.update(params).promise()
+    const result = documentClient.update(params).promise()
     console.log('changeStatus データ更新成功')
-    return
+    return result
   }
   catch(e) {
     console.error('changeStatus データ更新失敗', JSON.stringify(e))
-    return
   }
 }
 
 // Status を全て初期化する
 const changeAllStatus = async () => {
+  console.log("ステータス初期化開始")
   setDynamodbOptions()
+  // scan してユーザ ID でフィルタ
   const params = {
     TableName: tableName,
     FilterExpression: "UserId = :UserId",
@@ -177,16 +187,15 @@ const changeAllStatus = async () => {
     }
   }
   try {
+    // ユーザ ID の全部の sort キーを取得するして status を更新する
     const data: any = await documentClient.scan(params).promise()
-    data.Items.forEach((element: any) => {
-      changeStatus(0, element.Timetable)
-    })
-    console.log('changeAllStatus データ更新成功')
+    for(let element of data.Items) {
+      await changeStatus(0, element.Timetable)
+    }
     return
   }
   catch(e) {
     console.error("changeAllStatus データ更新失敗", JSON.stringify(e))
-    return
   }
 }
 
@@ -211,13 +220,12 @@ const sendMessage: any = async (lineMessage: Types.Message) => {
       const client = new Line.Client(config)
 
       try {
-        await client.pushMessage(userId, lineMessage)
+        const result = await client.pushMessage(userId, lineMessage)
         console.log('メッセージ送信成功')
-        return
+        return result
       }
       catch (e) {
         console.error('メッセージ送信失敗', JSON.stringify(e))
-        return
       }
   }
 }
