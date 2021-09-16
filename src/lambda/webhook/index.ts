@@ -10,12 +10,74 @@ const env: any = process.env.env
 const tableName: any = process.env.tableName
 let documentClient: any
 
-// Line UserId 取得
+// Line 関連
 const userId: any = process.env.userId
+const accessToken: string = process.env.accessToken!
+const channelSecret: string = process.env.channelSecret!
 
 // Lambda の実行 handler
-export const handler: Lambda.Handler = async (event: any) => {
+export const handler: Lambda.Handler = async (proxyEvent: any) => {
   console.log('処理開始')
+
+  const body: Line.WebhookRequestBody = JSON.parse(JSON.stringify(proxyEvent!));
+  await Promise
+    .all(body.events.map(async event => sendMessage(event)))
+    .catch(err => {
+      console.error(err.Message);
+      return {
+        statusCode: 500,
+        body: "Error"
+      }
+    })
+  return {
+    statusCode: 200,
+    body: "OK"
+  }
+}
+
+// Line message 送信
+const sendMessage: any = async (event: Line.WebhookEvent): Promise<any> => {
+  if (event.type !== 'message' || event.message.type !== 'text') {
+    return null
+  }
+
+  const config: Line.ClientConfig = {
+    channelAccessToken: accessToken,
+    channelSecret: channelSecret,
+  }
+  const client: Line.Client = new Line.Client(config)
+
+  try {
+    const data: Promise<any> = await fetchAllData()
+      .then((data: any) => {
+        let messages: string[] = []
+        let items: string[] = data.Items
+
+        // Hour 順にソート
+        items.sort((a: any, b: any) => {
+          if (a.Hour < b.Hour) {
+            return -1;
+          } else {
+            return 1;
+          }
+        })
+
+        // メッセージを配列に追加
+        items.forEach((item: any) => {
+          if (item.Hour === 0) {
+            messages.push(`${item.Timetable}は未設定`)
+          } else {
+            messages.push(`${item.Timetable}は${item.Hour}時`)
+          }
+        })
+
+        const lineMessage: Types.Message = {type: "text", text: messages.join('\n')}
+        return client.replyMessage(event.replyToken, lineMessage)
+      })
+  }
+  catch (e) {
+    console.error("メッセージ送信失敗", JSON.stringify(e))
+  }
 }
 
 // DynamoDB の初期設定
@@ -37,33 +99,24 @@ const setDynamodbOptions = (): void => {
   }
 }
 
-// Line message 送信
-const sendMessage: any = async (lineMessage: Types.Message) => {
-  switch (env) {
-    // local だったら console にメッセージを出力
-    case 'local': {
-      console.log(JSON.stringify(lineMessage))
-      break
+// DynamoDB から一覧データ取得
+const fetchAllData: any = async (): Promise<any> => {
+  console.log('データ取得開始')
+  setDynamodbOptions()
+
+  // scan してユーザ ID でフィルタ
+  const params = {
+    TableName: tableName,
+    FilterExpression: "UserId = :UserId",
+    ExpressionAttributeValues: {
+      ':UserId': userId,
     }
-    // local じゃなかったらメッセージ送信
-    default:
-      // Line token
-      const accessToken: string = process.env.accessToken!
-      const channelSecret: string = process.env.channelSecret!
-
-      const config: Line.ClientConfig = {
-        channelAccessToken: accessToken,
-        channelSecret: channelSecret,
-      }
-      const client = new Line.Client(config)
-
-      try {
-        const result = await client.pushMessage(userId, lineMessage)
-        console.log('メッセージ送信成功')
-        return result
-      }
-      catch (e) {
-        console.error('メッセージ送信失敗', JSON.stringify(e))
-      }
+  }
+  try {
+    // ユーザ ID の全部のレコードを取得
+    return await documentClient.scan(params).promise()
+  }
+  catch(e) {
+    console.error("データ取得失敗", JSON.stringify(e))
   }
 }
