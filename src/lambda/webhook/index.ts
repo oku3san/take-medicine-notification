@@ -10,10 +10,8 @@ const env: any = process.env.env
 const tableName: any = process.env.tableName
 let documentClient: any
 
-// Line 関連
+// userId 取得
 const userId: any = process.env.userId
-const accessToken: string = process.env.accessToken!
-const channelSecret: string = process.env.channelSecret!
 
 // Lambda の実行 handler
 export const handler: Lambda.Handler = async (proxyEvent: any) => {
@@ -21,26 +19,76 @@ export const handler: Lambda.Handler = async (proxyEvent: any) => {
 
   const body: Line.WebhookRequestBody = JSON.parse(JSON.stringify(proxyEvent!));
   await Promise
-    .all(body.events.map(async event => sendMessage(event)))
-    .catch(err => {
-      console.error(err.Message);
+    .all(body.events.map(async event => eventHandler(event)))
+    .catch((e) => {
+      console.error(JSON.stringify(e))
       return {
         statusCode: 500,
         body: "Error"
       }
     })
+  console.log('処理終了')
   return {
     statusCode: 200,
     body: "OK"
   }
 }
 
-// Line message 送信
-const sendMessage: any = async (event: Line.WebhookEvent): Promise<any> => {
+// メッセージの内容をもとに処理を切り替え
+const eventHandler = async (event: Line.WebhookEvent): Promise<any> => {
+
   if (event.type !== 'message' || event.message.type !== 'text') {
     return null
   }
 
+  // メッセージの内容をもとに処理を切り替え
+  switch (event.message.text) {
+    case '一覧表示': {
+      // DynamoDB から情報取得
+      const messages = await fetchAllData()
+        .then((data: any) => {  // 取得したデータをもとに処理
+          // Hour 順にソート
+          let items: string[] = data.Items
+          items.sort((a: any, b: any) => {
+            if (a.Hour < b.Hour) {
+              return -1;
+            } else {
+              return 1;
+            }
+          })
+
+          // メッセージを配列に追加
+          let messages: string[] = []
+          items.forEach((item: any) => {
+            if (item.Hour === 0) {
+              messages.push(`${item.Timetable}は未設定`)
+            } else {
+              messages.push(`${item.Timetable}は${item.Hour}時`)
+            }
+          })
+
+          return messages
+        })
+
+      // Line message 送信
+      const lineMessage: Types.Message = {type: "text", text: messages.join('\n')}
+      return await sendMessage(event.replyToken, lineMessage)
+      break
+    }
+    default: {
+      const lineMessage: Types.Message = {type: "sticker", packageId: '8515', stickerId: '16581263'};
+      return await sendMessage(event.replyToken, lineMessage)
+    }
+  }
+}
+
+// Line message 送信
+// replyToken と lineMessage を引数にする
+const sendMessage = async (replyToken: string, lineMessage: Types.Message): Promise<any> => {
+
+  // Line message を送信する初期設定
+  const accessToken: string = process.env.accessToken!
+  const channelSecret: string = process.env.channelSecret!
   const config: Line.ClientConfig = {
     channelAccessToken: accessToken,
     channelSecret: channelSecret,
@@ -48,34 +96,9 @@ const sendMessage: any = async (event: Line.WebhookEvent): Promise<any> => {
   const client: Line.Client = new Line.Client(config)
 
   try {
-    const data: Promise<any> = await fetchAllData()
-      .then((data: any) => {
-        let messages: string[] = []
-        let items: string[] = data.Items
-
-        // Hour 順にソート
-        items.sort((a: any, b: any) => {
-          if (a.Hour < b.Hour) {
-            return -1;
-          } else {
-            return 1;
-          }
-        })
-
-        // メッセージを配列に追加
-        items.forEach((item: any) => {
-          if (item.Hour === 0) {
-            messages.push(`${item.Timetable}は未設定`)
-          } else {
-            messages.push(`${item.Timetable}は${item.Hour}時`)
-          }
-        })
-
-        const lineMessage: Types.Message = {type: "text", text: messages.join('\n')}
-        return client.replyMessage(event.replyToken, lineMessage)
-      })
+    return await client.replyMessage(replyToken, lineMessage)
   }
-  catch (e) {
+  catch(e) {
     console.error("メッセージ送信失敗", JSON.stringify(e))
   }
 }
@@ -100,7 +123,7 @@ const setDynamodbOptions = (): void => {
 }
 
 // DynamoDB から一覧データ取得
-const fetchAllData: any = async (): Promise<any> => {
+const fetchAllData = async (): Promise<any> => {
   console.log('データ取得開始')
   setDynamodbOptions()
 
