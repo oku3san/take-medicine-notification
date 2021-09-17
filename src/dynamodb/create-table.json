@@ -5,8 +5,8 @@
             "AttributeType": "S"
         },
         {
-            "AttributeName": "Timetable",
-            "AttributeType": "S"
+            "AttributeName": "TimetableId",
+            "AttributeType": "N"
         },
         {
             "AttributeName": "Hour",
@@ -20,7 +20,7 @@
             "KeyType": "HASH"
         },
         {
-            "AttributeName": "Timetable",
+            "AttributeName": "TimetableId",
             "KeyType": "RANGE"
         }
     ],
@@ -42,7 +42,7 @@
                 }
             ],
             "Projection": {
-                "ProjectionType": "KEYS_ONLY"
+                "ProjectionType": "ALL"
             }
         }
     ]

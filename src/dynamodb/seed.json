@@ -6,6 +6,9 @@
           "UserId": {
             "S": "test-id"
           },
+          "TimetableId": {
+            "N": "0"
+          },
           "Timetable": {
             "S": "朝"
           },
@@ -24,6 +27,9 @@
           "UserId": {
             "S": "test-id"
           },
+          "TimetableId": {
+            "N": "1"
+          },
           "Timetable": {
             "S": "昼"
           },
@@ -41,6 +47,9 @@
         "Item": {
           "UserId": {
             "S": "test-id"
+          },
+          "TimetableId": {
+            "N": "2"
           },
           "Timetable": {
             "S": "夜"

@@ -127,7 +127,7 @@ const fetchData: any = async (hour: number) => {
 }
 
 // Status を変更する
-const changeStatus = async (status: number, timetable:string, hour?: number) => {
+const changeStatus = async (status: number, timetableId: number, hour?: number) => {
   console.log('changeStatus データ更新開始')
   setDynamodbOptions()
   let params: any
@@ -137,7 +137,7 @@ const changeStatus = async (status: number, timetable:string, hour?: number) => 
       TableName: tableName,
       Key: {
         'UserId': userId,
-        'Timetable': timetable
+        'TimetableId': timetableId
       },
       UpdateExpression: 'SET #S = :S ',
       ConditionExpression: '#Hr = :Hr',
@@ -156,7 +156,7 @@ const changeStatus = async (status: number, timetable:string, hour?: number) => 
       TableName: tableName,
       Key: {
         'UserId': userId,
-        'Timetable': timetable
+        'TimetableId': timetableId
       },
       UpdateExpression: 'SET #S = :S ',
       ExpressionAttributeNames: {
@@ -194,7 +194,7 @@ const changeAllStatus = async () => {
     // ユーザ ID の全部の sort キーを取得するして status を更新する
     const data: any = await documentClient.scan(params).promise()
     for(let element of data.Items) {
-      await changeStatus(0, element.Timetable)
+      await changeStatus(0, element.TimetableId)
     }
     return
   }
