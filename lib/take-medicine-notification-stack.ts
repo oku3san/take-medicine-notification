@@ -20,7 +20,7 @@ export class TakeMedicineNotificationStack extends cdk.Stack {
         name: 'UserId', type: dynamodb.AttributeType.STRING,
       },
       sortKey: {
-        name: 'Timetable', type: dynamodb.AttributeType.STRING,
+        name: 'TimetableId', type: dynamodb.AttributeType.NUMBER,
       },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.RETAIN
