@@ -5,6 +5,10 @@ import * as dynamodb from '@aws-cdk/aws-dynamodb';
 import * as events from '@aws-cdk/aws-events';
 import * as targets from '@aws-cdk/aws-events-targets';
 import * as ssm from '@aws-cdk/aws-ssm';
+import * as apigatewayv2 from '@aws-cdk/aws-apigatewayv2';
+import * as apigatewayv2Integration from '@aws-cdk/aws-apigatewayv2-integrations';
+import * as certificatemanager from '@aws-cdk/aws-certificatemanager';
+import * as route53 from "@aws-cdk/aws-route53";
 
 export class TakeMedicineNotificationStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -58,5 +62,58 @@ export class TakeMedicineNotificationStack extends cdk.Stack {
       }),
       targets: [new targets.LambdaFunction(cronFunction)]
     });
+
+    // Webhook
+    const domain:string = ssm.StringParameter.valueFromLookup(this, 'domain')
+
+    const hostedZone = route53.HostedZone.fromLookup(this, "hostedZone", {
+      domainName: domain
+    });
+
+    const lineBotAcm = new certificatemanager.Certificate(this, 'lineBotAcm', {
+      domainName: 'takemedicine.linebot.' + domain,
+      validation: certificatemanager.CertificateValidation.fromDns(hostedZone),
+    });
+
+    const webhookFunction = new lambda.DockerImageFunction(this, 'webhookFunction', {
+      code: lambda.DockerImageCode.fromImageAsset("src/lambda/webhook"),
+      memorySize: 128,
+      logRetention: logs.RetentionDays.ONE_WEEK,
+      environment: {
+        accessToken: accessToken,
+        channelSecret: channelSecret,
+        userId: userId,
+        tableName: dynamodbTable.tableName.toString(),
+      },
+      deadLetterQueueEnabled: true,
+    });
+
+    dynamodbTable.grantReadWriteData(webhookFunction);
+
+    const lineBotHttpApiDomain = new apigatewayv2.DomainName(this, 'lineBotHttpApiDomain', {
+      domainName: "takemedicine.linebot." + domain,
+      certificate: lineBotAcm
+    })
+
+    const lineBotHttpApi = new apigatewayv2.HttpApi(this, 'lineBotHttpApi', {
+      apiName: 'LineBotHttpApi',
+      defaultDomainMapping: {
+        domainName: lineBotHttpApiDomain
+      }
+    });
+
+    lineBotHttpApi.addRoutes({
+      path: '/',
+      methods: [ apigatewayv2.HttpMethod.POST ],
+      integration: new apigatewayv2Integration.LambdaProxyIntegration({
+        handler: webhookFunction
+      })
+    })
+
+    new route53.CnameRecord(this, 'cnameRecord', {
+      zone: hostedZone,
+      domainName: lineBotHttpApiDomain.regionalDomainName,
+      recordName: 'takemedicine.linebot',
+    })
   }
 }

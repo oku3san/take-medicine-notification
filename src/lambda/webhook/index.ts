@@ -12,12 +12,20 @@ let documentClient: any
 
 // userId 取得
 const userId: any = process.env.userId
+const accessToken: string = process.env.accessToken!
+const channelSecret: string = process.env.channelSecret!
 
 // Lambda の実行 handler
-export const handler: Lambda.Handler = async (proxyEvent: any) => {
+export const handler: Lambda.Handler = async (proxyEvent: Lambda.APIGatewayEvent, _context) => {
   console.log('処理開始')
 
-  const body: Line.WebhookRequestBody = JSON.parse(JSON.stringify(proxyEvent!));
+  // 署名確認
+  const signature: any = proxyEvent.headers["x-line-signature"];
+  if (!Line.validateSignature(proxyEvent.body!, channelSecret, signature)) {
+    throw new Line.SignatureValidationFailed("signature validation failed", signature);
+  }
+
+  const body: Line.WebhookRequestBody = JSON.parse(proxyEvent.body!);
   await Promise
     .all(body.events.map(async event => eventHandler(event)))
     .catch((e) => {
@@ -111,8 +119,6 @@ const eventHandler = async (event: Line.WebhookEvent): Promise<any> => {
 const sendMessage = async (replyToken: string, lineMessage: Types.Message): Promise<any> => {
 
   // Line message を送信する初期設定
-  const accessToken: string = process.env.accessToken!
-  const channelSecret: string = process.env.channelSecret!
   const config: Line.ClientConfig = {
     channelAccessToken: accessToken,
     channelSecret: channelSecret,
