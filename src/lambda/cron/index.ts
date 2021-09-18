@@ -57,7 +57,7 @@ export const handler: Lambda.Handler = async (event: any) => {
                {
                  "type": "message",
                  "label": "はい",
-                 "text": "はい"
+                 "text": `はい　${timetable}`
                },
                {
                  "type": "message",

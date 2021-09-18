@@ -107,8 +107,33 @@ const eventHandler = async (event: Line.WebhookEvent): Promise<any> => {
       const lineMessage: Types.Message = {type: "text", text: '登録実施'}
       return await sendMessage(event.replyToken, lineMessage)
     }
+    case event.message.text.startsWith('はい') && event.message.text: {
+      // 空白で split[登録,朝,11]のようになる
+      const messages: string[] = event.message.text.split('　')
+      switch (messages[1]) {
+        case '朝' : {
+          const timetableId: number = 0
+          await modifyData(timetableId, Number(messages[2]), 1)
+          break
+        }
+        case '昼' : {
+          const timetableId: number = 1
+          await modifyData(timetableId, Number(messages[2]), 1)
+          break
+        }
+        case '夜' : {
+          const timetableId: number = 2
+          await modifyData(timetableId, Number(messages[2]), 1)
+          break
+        }
+      }
+
+      // Line message 送信
+      const lineMessage: Types.Message = {type: "sticker", packageId: '6370', stickerId: '11088025'}
+      return await sendMessage(event.replyToken, lineMessage)
+    }
     default: {
-      const lineMessage: Types.Message = {type: "sticker", packageId: '8515', stickerId: '16581263'};
+      const lineMessage: Types.Message = {type: "sticker", packageId: '8515', stickerId: '16581263'}
       return await sendMessage(event.replyToken, lineMessage)
     }
   }
@@ -179,8 +204,10 @@ const modifyData = async (timetableId: number, hour: number, status?: number): P
   console.log('データ更新開始')
   setDynamodbOptions()
 
+  let params: object
   // 特定タイムテーブルの時間を更新する
-  const params = {
+  if (!status) {
+    params = {
       TableName: tableName,
       Key: {
         'UserId': userId,
@@ -194,6 +221,22 @@ const modifyData = async (timetableId: number, hour: number, status?: number): P
         ':Hr': hour,
       }
     }
+  } else {
+    params = {
+      TableName: tableName,
+      Key: {
+        'UserId': userId,
+        'TimetableId': timetableId
+      },
+      UpdateExpression: 'SET #St = :St ',
+      ExpressionAttributeNames: {
+        '#St': 'Status',
+      },
+      ExpressionAttributeValues: {
+        ':St': status,
+      }
+    }
+  }
   try {
     // 特定タイムテーブルの時間を更新する
     return await documentClient.update(params).promise()
